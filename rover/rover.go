@@ -163,6 +163,7 @@ func processFile(path string, info os.FileInfo, err error) error {
 	// Find the nearest .gitignore file
 	gitignorePath, err := findNearestGitignore(filepath.Dir(path))
 	if err != nil {
+log.Panicln("gitignore error")
 		return err
 	}
 
@@ -178,11 +179,26 @@ func processFile(path string, info os.FileInfo, err error) error {
 		}
 	}
 
-	// Check if the file is an .md file
-	if filepath.Ext(path) == ".md" {
-		fmt.Printf("Skipping %s (Markdown file)\n", path)
-		return nil
-	}
+// Check if the file is within a . folder
+if strings.Contains(filepath.Dir(path), string(filepath.Separator)+".") {
+	fmt.Printf("Skipping %s (File within a dot folder)\n", path)
+	return nil
+}
+
+
+// Check if the file is an .md file, image, or video
+ext := filepath.Ext(path)
+
+if ext == ".md" {
+    fmt.Printf("Skipping %s (Markdown file)\n", path)
+    return nil
+} else if ext == ".jpg" || ext == ".jpeg" ||   ext == ".ico" || ext == ".png" || ext == ".gif" {
+    fmt.Printf("Skipping %s (Image file)\n", path)
+    return nil
+	} else if ext == ".mp4" || ext == ".avi" || ext == ".mov" || ext == ".mkv" {
+    fmt.Printf("Skipping %s (Video file)\n", path)
+    return nil
+	} 
 
 	// Check if the file is an .mod file
 	if filepath.Ext(path) == ".mod" {
@@ -195,6 +211,12 @@ func processFile(path string, info os.FileInfo, err error) error {
 		fmt.Printf("Skipping %s (Sum file)\n", path)
 		return nil
 	}
+
+mdCounterpart := filepath.Join(filepath.Dir(path), filepath.Base(path[0:len(path)-len(ext)])+".md")
+if _, err := os.Stat(mdCounterpart); err == nil {
+	fmt.Printf("Skipping %s (File with .md counterpart exists)\n", path)
+	return nil
+}
 
 
 	if info.IsDir() {
