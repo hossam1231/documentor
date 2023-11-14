@@ -5,11 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
-	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"log"
+	"net/http"
 )
 
 const cloudflareAPIEndpoint = "https://api.cloudflare.com/client/v4/accounts/0843a42dc7915eb7a5ca1e3bb05cfce2/ai/run/@cf/meta/llama-2-7b-chat-int8"
@@ -118,22 +119,87 @@ newContent := string(content) + "\n" + responseMarkdown
     return nil
 }
 
+func findNearestGitignore(dir string) (string, error) {
+	for dir != "/" {
+		gitignorePath := filepath.Join(dir, ".gitignore")
+		if _, err := os.Stat(gitignorePath); err == nil {
+			return gitignorePath, nil
+		}
+		dir = filepath.Dir(dir)
+	}
+	return "", nil
+}
+
+func isPathIgnored(path, gitignorePath string) (bool, error) {
+	gitignoreData, err := ioutil.ReadFile(gitignorePath)
+	if err != nil {
+		return false, err
+	}
+
+	gitignoreLines := strings.Split(string(gitignoreData), "\n")
+	for _, pattern := range gitignoreLines {
+		// Skip comments and empty lines
+		if strings.HasPrefix(pattern, "#") || strings.TrimSpace(pattern) == "" {
+			continue
+		}
+
+		matched, err := filepath.Match(pattern, path)
+		if err != nil {
+			return false, err
+		}
+		if matched {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
 
 func processFile(path string, info os.FileInfo, err error) error {
+		if err != nil {
+		return err
+	}
+
+	// Find the nearest .gitignore file
+	gitignorePath, err := findNearestGitignore(filepath.Dir(path))
 	if err != nil {
 		return err
 	}
 
+	// Check if the file should be ignored based on .gitignore rules
+	if gitignorePath != "" {
+		matches, err := isPathIgnored(path, gitignorePath)
+		if err != nil {
+			return err
+		}
+		if matches {
+			fmt.Printf("Skipping %s based on .gitignore rules\n", path)
+			return nil
+		}
+	}
+
+	// Check if the file is an .md file
+	if filepath.Ext(path) == ".md" {
+		fmt.Printf("Skipping %s (Markdown file)\n", path)
+		return nil
+	}
+
+	// Check if the file is an .mod file
+	if filepath.Ext(path) == ".mod" {
+		fmt.Printf("Skipping %s (Mod file)\n", path)
+		return nil
+	}
+
+		// Check if the file is an .sum file
+	if filepath.Ext(path) == ".sum" {
+		fmt.Printf("Skipping %s (Sum file)\n", path)
+		return nil
+	}
+
+
 	if info.IsDir() {
 		return nil
 	}
-
-	// Skip processing .md files
-	if filepath.Ext(path) == ".md" {
-		fmt.Printf("Skipping %s\n", path)
-		return nil
-	}
-
 	mdFilename := convertToMarkdown(path)
 	fmt.Printf("Copying %s to %s\n", path, mdFilename)
 
